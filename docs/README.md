@@ -120,13 +120,13 @@ SQLite with JSON extensions enables:
 
 # 4. Commands & Usage
 
-  | Command             | Description                                                             |
-  | ------------------- | ----------------------------------------------------------------------- |
-  | `/netimport <file>` | Parses a PCAP/PCAPNG file and synchronizes it with the server database. |
-  | `/netstats`         | Displays high-level statistics of the current capture.                  |
-  | `/netviz --flow`    | Generates an interactive Sankey diagram of network flows.               |
-  | `/netask <query>`   | Performs a RAG-based forensic analysis using Qwen 2.5.                  |
-  | `/neofetch`         | Displays local and server system telemetry.                             |
+  | Command                | Description                                                             |
+  | ---------------------- | ----------------------------------------------------------------------- |
+  | `/netimport <file>`    | Parses a PCAP/PCAPNG file and synchronizes it with the server database. |
+  | `/netstats`            | Displays high-level statistics of the current capture.                  |
+  | `/netviz --flow`       | Generates an interactive Sankey diagram of network flows.               |
+  | `/netask [capture_id]  | <question>`   | Performs a RAG-based forensic analysis using Qwen 2.5.  |
+  | `/neofetch`            | Displays local and server system telemetry.                             |
 
 # 5. Installation & Setup
 
