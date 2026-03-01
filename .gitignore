@@ -1,0 +1,64 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# --- Virtual Environments ---
+venv/
+.venv/
+ENV/
+
+# --- Environment Variables & Secrets ---
+# Εδώ κρύβουμε τις IPs και τα API keys
+.env
+.venv
+env.ini
+config.ini
+
+# --- Databases ---
+# Δεν ανεβάζουμε τη βάση δεδομένων, μόνο τον κώδικα που τη φτιάχνει
+*.db
+*.sqlite
+*.sqlite3
+
+# --- Network Forensics (Large Files) ---
+# Τα αρχεία κίνησης είναι πολύ μεγάλα για το GitHub
+*.pcap
+*.pcapng
+*.cap
+*.dump
+
+# --- Machine Learning Models ---
+# Τα εκπαιδευμένα μοντέλα είναι βαριά αρχεία
+*.h5
+*.keras
+*.pkl
+*.model
+*.pt
+*.pth
+*.onnx
+
+# --- IDE & System Files ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
