@@ -12,15 +12,29 @@ Instead of simply displaying packet data, Zeta introduces a semantic reasoning l
 
 Project Zeta follows a distributed architecture separating ingestion, storage, and reasoning from analyst interaction.
 
-PCAP
-   ↓
-Server (Ingestion & Storage)
-   ↓
-Structured Network Memory
-   ↓
-LLM Reasoning Layer (RAG)
-   ↓
-Client Interface & Visualizations
+      ┌──────────────┐
+      │     PCAP     │
+      └──────┬───────┘
+             │
+             ▼
+      ┌──────────────────────────┐
+      │ Server (Ingestion & API) │
+      └──────┬───────────────────┘
+             │
+             ▼
+      ┌──────────────────────────┐
+      │ Structured Network Memory│
+      └──────┬───────────────────┘
+             │
+             ▼
+      ┌──────────────────────────┐
+      │   LLM Reasoning (RAG)    │
+      └──────┬───────────────────┘
+             │
+             ▼
+      ┌──────────────────────────┐
+      │ Client & Visualizations  │
+      └──────────────────────────┘
 
 Server (Debian / Proxmox)
 
