@@ -96,6 +96,11 @@ SQLite with JSON extensions enables:
   
     Qwen (via Ollama)
 
+  <p align="center">
+    <img src="screenshots/netask_example.png" width="700" alt="netask_example">
+  </p>
+
+
   B. Structured Behavioral Analysis
 
   Zeta converts packet-level telemetry into structured, queryable representations.
@@ -137,6 +142,10 @@ SQLite with JSON extensions enables:
   | `/netviz --top-ips`    | Generates an interactive Bar graph of the top 10 present IPs in the cap.|
   | `/netask [capture_id]` | Performs a RAG-based forensic analysis using Qwen 2.5.                  |
   | `/neofetch`            | Displays local and server system telemetry.                             |
+
+  <p align="center">
+    <img src="screenshots/net_command.png" width="700" alt="net_command">
+  </p>
 
 # 5. Installation & Setup
 
