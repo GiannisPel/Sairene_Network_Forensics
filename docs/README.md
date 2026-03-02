@@ -96,7 +96,9 @@ SQLite with JSON extensions enables:
   
     Qwen (via Ollama)
 
-
+  <p align="center">
+    <img src="screenshots/netask_example.png" width="900" alt="netask_example">
+  </p>
 
 
   B. Structured Behavioral Analysis
