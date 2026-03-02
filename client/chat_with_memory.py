@@ -363,7 +363,7 @@ def net_viz_flow_gui(capture_id: str):
 
 def build_system_messages(memory_block: str, wiki_block: str) -> List[Dict[str, str]]:
     system_text = (
-        "You are a local AI assistant running on the user's computer. "
+        "You are a local AI assistant named ZETA running on the user's computer. "
         "The user is speaking directly to you and when the user addresses you, answer accordingly. "
         "Use provided RELEVANT MEMORIES and WIKIPEDIA CONTEXT when they help. "
         "If you are uncertain, say so and ask a brief clarifying question. "
@@ -820,4 +820,5 @@ def main():
 
 
 if __name__ == "__main__":
+
     main()
