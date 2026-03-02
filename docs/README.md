@@ -97,7 +97,7 @@ SQLite with JSON extensions enables:
     Qwen (via Ollama)
 
   <p align="center">
-    <img src="screenshots/netask_example.png" width="700" alt="netask_example">
+    <img src="screenshots/netask_example.png" width="800" alt="netask_example">
   </p>
 
 
@@ -144,7 +144,7 @@ SQLite with JSON extensions enables:
   | `/neofetch`            | Displays local and server system telemetry.                             |
 
   <p align="center">
-    <img src="screenshots/net_command.png" width="700" alt="net_command">
+    <img src="screenshots/net_command.png" width="600" alt="net_command">
   </p>
 
 # 5. Installation & Setup
