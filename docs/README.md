@@ -5,7 +5,7 @@
 ![TensorFlow](https://img.shields.io/badge/TensorFlow-2.15-FF6F00.svg?style=flat&logo=tensorflow&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
-## 1. Abstract
+## 📒 1. Abstract
 
 Project Zeta is a distributed Client–Server application designed for intelligent network forensic analysis and real-time threat hunting.
 
@@ -17,7 +17,7 @@ Instead of simply displaying packet data, Zeta introduces a semantic reasoning l
   <img src="screenshots/Greetings_Zeta.png" width="800" alt="Zeta says hello">
 </p>
 
-## 2. System Architecture
+## 🏗️ 2. System Architecture
 
 Project Zeta follows a distributed architecture separating ingestion, storage, and reasoning from analyst interaction.
 
@@ -76,7 +76,7 @@ SQLite with JSON extensions enables:
   - Efficient aggregation queries
   - Structured retrieval for LLM grounding
 
-## 3. Key Features & Methodology
+## 🔑 3. Key Features & Methodology
   ### A. Retrieval-Augmented Generation (RAG)
 
   Command: /netask <query>
@@ -137,7 +137,7 @@ SQLite with JSON extensions enables:
   
   All visualizations are rendered via Plotly for interactive exploration.
 
-## 4. Commands & Usage
+## ⌨️ 4. Commands & Usage
 
   | Command                | Description                                                             |
   | ---------------------- | ----------------------------------------------------------------------- |
@@ -152,7 +152,7 @@ SQLite with JSON extensions enables:
     <img src="screenshots/net_command.png" width="400" alt="net_command">
   </p>
 
-## 5. Installation & Setup
+## 📥 5. Installation & Setup
 
   - Server Side:
 
