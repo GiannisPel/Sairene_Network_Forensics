@@ -173,3 +173,5 @@ SQLite with JSON extensions enables:
          
     - 3. Install client dependencies:
          pip install -r client/requirments_client.txt
+
+# MACHINE LEARNING ALGORITHM FOR NETWORK ANOMALY FOR CAPTURE IS IN WORK AND BE PUBLISHED IN THE NEAR FUTURE
