@@ -124,7 +124,7 @@ SQLite with JSON extensions enables:
     Source → Port → Destination flow modeling
     Weighted interaction intensity
 
-  <p align="left">
+  <p align="center">
     <img src="screenshots/Sankey_example.png" width="800" alt="Sankey_example">
   </p>
   
