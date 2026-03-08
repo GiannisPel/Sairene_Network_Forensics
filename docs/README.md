@@ -155,7 +155,7 @@ SQLite with JSON extensions enables:
   | ---------------------- | --------------------------------------------------------------------------- |
   | `/netimport <file>`    | Parses a PCAP/PCAPNG file and synchronizes it with the server database.     |
   | `/netstats`            | Displays high-level statistics of the current capture.                      |
-  | `/netanomalies [capture_id]`| Runs ML detection and generates an interactive anomaly timeline.       |
+  | `/netviz --anom`| Runs ML detection and generates an interactive anomaly timeline.       |
   | `/netviz --flow`       | Generates an interactive Sankey diagram of network flows.                   |
   | `/netviz --top-ips`    | Generates an interactive Bar graph of the top 10 present IPs.               |
   | `/netask [capture_id]` | Performs a RAG-based forensic analysis using Qwen 2.5.                      |
