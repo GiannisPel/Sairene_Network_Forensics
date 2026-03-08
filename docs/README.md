@@ -101,12 +101,6 @@ SQLite with JSON extensions enables:
     <img src="screenshots/netask_example.png" width="900" alt="netask_example">
   </p>
 
-  And with the command: /netviz --top-ips, we can confirm the output of the model:
-
-  <p align="center">
-    <img src="screenshots/top_ips_example.png" width="700" alt="top_ips_example">
-  </p>
-
   ### B. Structured Behavioral Analysis
 
   Zeta converts packet-level telemetry into structured, queryable representations.
@@ -129,6 +123,10 @@ SQLite with JSON extensions enables:
   
     Source → Port → Destination flow modeling
     Weighted interaction intensity
+
+  <p align="left">
+    <img src="screenshots/Sankey_example.png" width="800" alt="Sankey_example">
+  </p>
   
   Dynamic Bar Charts
   
@@ -136,8 +134,8 @@ SQLite with JSON extensions enables:
     Protocol distribution
     Real-time traffic statistics
 
-  <p align="left">
-    <img src="screenshots/Sankey_example.png" width="800" alt="Sankey_example">
+  <p align="center">
+    <img src="screenshots/top_ips_example.png" width="700" alt="top_ips_example">
   </p>
   
   All visualizations are rendered via Plotly for interactive exploration.
