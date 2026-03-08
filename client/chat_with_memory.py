@@ -104,18 +104,15 @@ Net commands:
       Import a Wireshark capture into the network RAG store.
       Example: /netimp "C:\Wireshark_captures\This_is_a_test.pcapng"
 
-  /netviz [capture_id] --top-ips/--flow
+  /netviz [capture_id] --top-ips/--flow/--anom
       --top-ips: Shows the 10 most communicative IPs with machine
       --flow: Shows the source/port/destination of the top 15 IPs
+      --anom: Shows the rate of the anomalies in terminal and in a graph 
       Example: /netviz test.pcapng --top-ips
 
   /netask [capture_id] | <question>
       Ask questions about imported network data.
       Example: /net ask test1.pcapng | what protocols are present?
-
-  /netanomalies [capture_id]
-      Shows the rate of the anomalies in terminal and in a graph 
-      Example: /netanomalies test1.pcapng
 
   /netstats
       Show quick stats for the current / selected capture.
@@ -223,7 +220,7 @@ def ollama_chat_stream(messages: List[Dict[str, str]], model: str, timeout: int 
 def extract_protocols_from_text(s: str) -> Counter:
     """
     Extract protocol tokens from Scapy-style summary strings like:
-    'Ether / IP / TCP 192.168.1.167:55191 > 192.168.1.50:8006 RA'
+    'Ether / IP / TCP 192.168.x.x:55191 > 192.168.x.x:8006 RA'
     """
     c = Counter()
     if not s:
@@ -784,34 +781,23 @@ def main():
                 elif flag == "--flow":
                     net_viz_flow_gui(capture_id)
 
+                elif flag == "--anom":
+                    anomalies = get_anomalies(capture_id)
+
+                    #Print on Terminal for fast info
+                    print_anomalies(anomalies)
+
+                    #Visualiazation for analysis
+                    if anomalies:
+                        print(f"\nZeta: Generating anomaly timeline for {capture_id}...")
+                        viz_anomalies_plotly(anomalies, capture_id)
+                    
                 else:
                     print("Unknown flag. Use --top-ips or --flow\n")
 
             except Exception as e:
                 print(f"Visualization failed: {e}\n")
 
-            continue
-
-        elif cmd.startswith("/netanomalies"):
-
-            parts = cmd.split()
-
-            if len(parts) < 2:
-                print("Usage: /netanomalies <capture_id>")
-                continue
-
-            capture_id = parts[1]
-
-            anomalies = get_anomalies(capture_id)
-
-            #Print on Terminal for fast info
-            print_anomalies(anomalies)
-
-            #Visualiazation for analysis
-            if anomalies:
-                print(f"\nZeta: Generating anomaly timeline for {capture_id}...")
-                viz_anomalies_plotly(anomalies, capture_id)
-            
             continue
 
         # /net import <file path>
