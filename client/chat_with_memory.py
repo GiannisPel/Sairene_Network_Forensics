@@ -94,7 +94,7 @@ ERROR_BANNER = r"""
 
 NET_HELP = """
 \n
-NETWORK FORENSIC KNOWLEDGE BASE, made by Mpakalogatos.
+NETWORK FORENSIC KNOWLEDGE BASE, made by GiannisPel.
 
 Net commands:
   /netadd <text>
@@ -940,3 +940,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
