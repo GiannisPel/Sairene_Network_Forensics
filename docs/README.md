@@ -36,6 +36,11 @@ Project Zeta follows a distributed architecture separating ingestion, storage, a
       │ Structured Network Memory│
       └──────┬───────────────────┘
              │
+             ▼  
+      ┌───────────────────────────────────────┐
+      │ML Anomaly Detection (Isolation Forest)│
+      └──────┬────────────────────────────────┘
+             │
              ▼
       ┌──────────────────────────┐
       │   LLM Reasoning (RAG)    │
