@@ -105,11 +105,11 @@ The client is responsible for:
   
   Analytical capabilities include:
   
-  - Source-to-destination flow mapping
-  - Port usage distribution
-  - Traffic concentration analysis
-  - High-volume talker identification
-  - Protocol distribution tracking
+  - **Who is talking to whom:** Maps out the path from the starting device to the destination.
+  - **What "doors" are being used:** Tracks which ports (like web browsing) are active.Port usage distribution
+  - **Where the traffic is piling up:** Pinpoints areas where the network is getting crowded.
+  - **Who the "loudest" users are:** Quickly identifies the devices using the most data.
+  - **What languages are being spoken:** Breaks down which protocols (the rules for communication) are being used most often.
     
   This allows analysts to move from raw packets to interaction-level reasoning.
 
