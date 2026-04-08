@@ -23,20 +23,20 @@ Instead of simply displaying packet data, Zeta introduces a semantic reasoning l
 This version introduces significant architectural improvements to the Local Memory Service and the PCAP ingestion pipeline, focusing on high-performance vector search and robust data processing.
 
 ### 🧠 Performance & Scalability
-RAM-Based Vector Search: The FAISS index is now managed as a Singleton and cached in memory. This eliminates the overhead of reading the index from disk for every query, ensuring sub-millisecond search times regardless of dataset size.
+- RAM-Based Vector Search: The FAISS index is now managed as a Singleton and cached in memory. This eliminates the overhead of reading the index from disk for every query, ensuring sub-millisecond search times regardless of dataset size.
 
-Batch Database Retrieval: Replaced "N+1" query patterns with optimized batch SQL requests. When retrieving search results, the system now fetches all metadata in a single database trip rather than multiple individual queries.
+- Batch Database Retrieval: Replaced "N+1" query patterns with optimized batch SQL requests. When retrieving search results, the system now fetches all metadata in a single database trip rather than multiple individual queries.
 
-SQL Indexing: Added explicit indices on frequently searched columns like faiss_row and capture_id to maintain speed as the database grows.
+- SQL Indexing: Added explicit indices on frequently searched columns like faiss_row and capture_id to maintain speed as the database grows.
 
 ### 🛠️ Stability & Bug Fixes
-ICMP/DNS Logic Separation: Fixed a critical bug in the PCAP ingester where DNS parsing was incorrectly nested inside ICMP logic. The system can now process ICMP packets (pings) without crashing and correctly identifies DNS queries across UDP and TCP.
+- ICMP/DNS Logic Separation: Fixed a critical bug in the PCAP ingester where DNS parsing was incorrectly nested inside ICMP logic. The system can now process ICMP packets (pings) without crashing and correctly identifies DNS queries across UDP and TCP.
 
-Database Schema Alignment: Resolved a mismatch in the init_db function to ensure the embedding BLOB column is correctly created and populated.
+- Database Schema Alignment: Resolved a mismatch in the init_db function to ensure the embedding BLOB column is correctly created and populated.
 
-Safe Shutdowns: Implemented FastAPI shutdown handlers to ensure the in-memory FAISS index is successfully flushed to disk whenever the service stops.
+- Safe Shutdowns: Implemented FastAPI shutdown handlers to ensure the in-memory FAISS index is successfully flushed to disk whenever the service stops.
 
-Reliable Index Rebuilding: Fixed a syntax error (fetchball typo) in the index maintenance tool, allowing for safe index reconstruction from the SQLite database.
+- Reliable Index Rebuilding: Fixed a syntax error (fetchball typo) in the index maintenance tool, allowing for safe index reconstruction from the SQLite database.
 
 ### 📡 Enhanced Network Intelligence
 Improved DNS Visibility: The ingestion engine now reliably extracts and stores DNS query names. This provides much deeper context for security analysis and semantic searching of network logs.
