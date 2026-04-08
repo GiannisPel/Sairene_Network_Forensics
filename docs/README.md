@@ -41,6 +41,9 @@ This version introduces significant architectural improvements to the Local Memo
 ### 📡 Enhanced Network Intelligence
 Improved DNS Visibility: The ingestion engine now reliably extracts and stores DNS query names. This provides much deeper context for security analysis and semantic searching of network logs.
 
+## ✍🏻 What is next:
+Im thinking of changing the architecture of the app from Python to Rust for speed
+
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 ## 🏗️ 2. System Architecture
