@@ -10,7 +10,7 @@ from scapy.layers.dns import DNS
 
 from embedder import embed_text
 from ml_anomaly import load_model, extract_features, predict
-from app import net_db, load_or_create_net_index, save_net_index
+from app import net_db, get_net_index, flush_net_index
 
 
 def ingest_pcap_file(path: str, capture_id: str) -> int:
@@ -20,7 +20,7 @@ def ingest_pcap_file(path: str, capture_id: str) -> int:
     """
 
     packets = rdpcap(path)
-    idx = load_or_create_net_index(dim=384)
+    idx = get_net_index(dim=384)
 
     model = load_model()
 
@@ -99,7 +99,7 @@ def ingest_pcap_file(path: str, capture_id: str) -> int:
                 "protocol": "ICMP"
             }
 
-        #FIXED: DNS block was incorrectly indented inside the ICMP branch, meaning it never ran (DNS travels over UDP, not ICMP) and would crash on any ICMP packet that reached it. Moved to its own block.
+        #FIXED: DNS block was incorrectly indented inside the ICMP branch,
         if DNS in pkt:
             meta["layers"]["application"]["protocol"] = "DNS"
             dns = pkt[DNS]
@@ -152,6 +152,10 @@ def ingest_pcap_file(path: str, capture_id: str) -> int:
 
     conn.commit()
     conn.close()
-    save_net_index(idx)
+
+    #Mark index dirty and flush to disk
+    import app as _app
+    _app._net_index_dirty = True
+    flush_net_index()
 
     return added
