@@ -9,13 +9,14 @@ from embedder import embed_text
 import numpy as np
 import faiss
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from fastapi import Query, UploadFile, File
 import tempfile
 
-# ---------------------------------------------------------------------------
-# Paths were all configurable via environment variables
-# ---------------------------------------------------------------------------
+
+#Paths all configurable via environment variables
+
 NET_DIR        = os.environ.get("NET_DATA_DIR",    "/var/lib/memory_service/net")
 NET_DB_PATH    = os.path.join(NET_DIR,  "net.db")
 NET_FAISS_PATH = os.path.join(NET_DIR,  "net.faiss")
@@ -33,16 +34,15 @@ os.makedirs(DATA_DIR, exist_ok=True)
 
 app = FastAPI(title="Local Memory Service")
 
-# ---------------------------------------------------------------------------
-# In memory FAISS singletons
-# FIXED: previously every endpoint called faiss.read_index() on every request,
-#        deserializing the entire index from disk each time. Now loaded once.
-# ---------------------------------------------------------------------------
+
+#In memory FAISS singletons
+#FIXED: previously every endpoint called faiss.read_index() on every request, deserializing the entire index from disk each time. Now loaded once.
 _mem_index:  Optional[faiss.Index] = None
 _net_index:  Optional[faiss.Index] = None
 _wiki_index: Optional[faiss.Index] = None
 
-#Dirty flags, index written to disk only when marked dirty, not on every single add_memory call.
+#Dirty flags when index written to disk only when marked dirty,
+#not on every single add_memory call
 _mem_index_dirty:  bool = False
 _net_index_dirty:  bool = False
 _wiki_index_dirty: bool = False
@@ -108,9 +108,8 @@ def on_shutdown():
     flush_wiki_index()
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+#Helpers
+
 def _dir_size_bytes(path: str) -> int:
     total = 0
     for root, _, files in os.walk(path):
@@ -141,16 +140,17 @@ def normalize(v: np.ndarray) -> np.ndarray:
     return (v / n).astype(np.float32)
 
 
-# ---------------------------------------------------------------------------
-# SQLite connection helpers
-# FIXED: net_db() was missing WAL and synchronous pragmas that db() had.
-#        Added cache_size and temp_store for performance on limited RAM.
-#        Added missing faiss_row indexes on all three tables.
-# ---------------------------------------------------------------------------
+
+#SQLite connection helpers
+
+#FIXED: net_db() was missing WAL and synchronous pragmas that db() had
+#So I added cache_size and temp_store for performance on limited RAM
+#and added missing faiss_row indexes on all three tables
+
 def _apply_pragmas(conn: sqlite3.Connection) -> None:
     conn.execute("PRAGMA journal_mode=WAL;")
     conn.execute("PRAGMA synchronous=NORMAL;")
-    conn.execute("PRAGMA cache_size=-32000;")   # 32 MB page cache
+    conn.execute("PRAGMA cache_size=-32000;")   #32 MB page cache
     conn.execute("PRAGMA temp_store=MEMORY;")
 
 def db() -> sqlite3.Connection:
@@ -172,7 +172,7 @@ def net_db() -> sqlite3.Connection:
             faiss_row  INTEGER NOT NULL
         );
     """)
-    #FIXED: missing indexes, the retrieve was doing a full table scan per result
+    #FIXED:missing indexes when retrieve was doing a full table scan per result
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_net_faiss_row "
         "ON net_memories(faiss_row);"
@@ -237,7 +237,7 @@ def init_db() -> None:
             embedding    BLOB
         );
     """)
-    #FIXED: missing index — retrieve was doing a full table scan per result
+    #FIXED: missing index where retrieve was doing a full table scan per result
     cur.execute(
         "CREATE INDEX IF NOT EXISTS idx_mem_faiss_row ON memories(faiss_row);"
     )
@@ -253,9 +253,9 @@ def init_db() -> None:
     conn.close()
 
 
-# ---------------------------------------------------------------------------
-# Dimension helpers
-# ---------------------------------------------------------------------------
+
+#Dimension helpers
+
 def get_dim() -> Optional[int]:
     conn = db()
     cur  = conn.cursor()
@@ -286,9 +286,9 @@ def wiki_set_dim(dim: int) -> None:
         f.write(str(dim))
 
 
-# ---------------------------------------------------------------------------
-# Pydantic models
-# ---------------------------------------------------------------------------
+
+#Pydantic models
+
 class WikiAddTextReq(BaseModel):
     title: str
     chunk: int
@@ -332,9 +332,9 @@ class RetrieveReq(BaseModel):
     conversation_id: Optional[str] = None
 
 
-# ---------------------------------------------------------------------------
-# Stats & health
-# ---------------------------------------------------------------------------
+
+#Stats & health
+
 @app.get("/stats")
 def stats():
     memory_dir = os.environ.get("MEMORY_DATA_DIR", "/var/lib/memory_service")
@@ -362,9 +362,7 @@ def wiki_health():
     return {"ok": True}
 
 
-# ---------------------------------------------------------------------------
-# Wiki endpoints
-# ---------------------------------------------------------------------------
+#Wiki endpoints
 @app.post("/wiki/add_text")
 def wiki_add_text(req: WikiAddTextReq):
     global _wiki_index_dirty
@@ -384,7 +382,7 @@ def wiki_add_text(req: WikiAddTextReq):
     faiss_row = int(idx.ntotal)
     idx.add(emb.reshape(1, -1))
     _wiki_index_dirty = True
-    flush_wiki_index()  #wiki ingest is offline batch work, flush immediately
+    flush_wiki_index()  #wiki ingest is offline batch work then flush immediately
 
     now       = time.time()
     memory_id = str(uuid.uuid4())
@@ -456,9 +454,9 @@ def wiki_retrieve(req: WikiRetrieveReq):
     return {"memories": out}
 
 
-# ---------------------------------------------------------------------------
-# Net endpoints
-# ---------------------------------------------------------------------------
+
+#Net endpoints
+
 @app.post("/net/import_pcap")
 async def net_import_pcap(file: UploadFile = File(...)):
     suffix = os.path.splitext(file.filename)[1].lower()
@@ -479,6 +477,79 @@ async def net_import_pcap(file: UploadFile = File(...)):
             os.unlink(tmp_path)
         except Exception:
             pass
+
+#Progress bar when importing
+#Where the synchronous CPUheavy ingest runs in a background thread 
+#It pushes events into a queue. The async generator drains the queue and yields lines to the HTTP response 
+#This lets uvicorn flush each line to the client immediately instead of buffering everything until the ingest finishes
+@app.post("/net/import_pcap_stream")
+async def net_import_pcap_stream(file: UploadFile = File(...)):
+
+    import asyncio
+    import queue
+    import threading
+
+    suffix = os.path.splitext(file.filename)[1].lower()
+    if suffix not in {".pcap", ".pcapng"}:
+        raise HTTPException(status_code=400, detail="Only .pcap/.pcapng supported")
+
+    contents = await file.read()
+    filename = file.filename
+
+    #Write temp file before starting thread
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(contents)
+        tmp_path = tmp.name
+
+    #Placed in queue by the thread when it is done (sentinel)
+    _DONE = object()
+
+    event_queue: queue.Queue = queue.Queue()
+
+    def run_ingest():
+        """Runs in a background thread. Pushes string lines into event_queue."""
+        try:
+            from net_pcap_ingest import ingest_pcap_file_stream
+
+            for event in ingest_pcap_file_stream(tmp_path, capture_id=filename):
+                if len(event) == 2:
+                    current, total = event
+                    if current == 0:
+                        event_queue.put(f"TOTAL {total}\n")
+                    else:
+                        event_queue.put(f"PROGRESS {current} {total}\n")
+                elif len(event) == 3:
+                    added, total, cap_id = event
+                    event_queue.put(f"DONE {added} {cap_id}\n")
+
+        except Exception as e:
+            event_queue.put(f"ERROR {e}\n")
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+            event_queue.put(_DONE)
+
+    #Start the ingest thread
+    thread = threading.Thread(target=run_ingest, daemon=True)
+    thread.start()
+
+    async def generate():
+        """
+        Async generator that drains event_queue.
+        Yields each line immediately so the HTTP response flushes to the
+        client in real time rather than buffering until ingest completes.
+        """
+        loop = asyncio.get_event_loop()
+        while True:
+            #Run the blocking queue.get in a thread pool so it doesnt block the event loop while waiting for the next batch
+            line = await loop.run_in_executor(None, event_queue.get)
+            if line is _DONE:
+                break
+            yield line
+
+    return StreamingResponse(generate(), media_type="text/plain")
 
 @app.post("/net/add_text")
 def net_add_text(req: NetAddTextReq):
@@ -537,7 +608,7 @@ def net_retrieve(req: NetRetrieveReq):
     if not valid:
         return {"ok": True, "results": []}
 
-    #FIXED: single batch query instead of one SELECT per result
+    #FIXED:single batch query instead of one SELECT per result
     placeholders = ",".join("?" * len(valid))
     row_ids   = [r for _, r in valid]
     score_map = {r: s for s, r in valid}
@@ -575,7 +646,7 @@ def net_reset():
         os.remove(NET_DB_PATH)
     if os.path.exists(NET_FAISS_PATH):
         os.remove(NET_FAISS_PATH)
-    _net_index = None  #invalidate singleton so it's rebuilt on next request
+    _net_index = None  #invalidate singleton so its rebuilt on next request
     return {"ok": True}
 
 @app.get("/net/captures")
@@ -588,6 +659,33 @@ def net_captures():
     rows = [{"capture_id": r[0], "count": int(r[1])} for r in cur.fetchall()]
     conn.close()
     return {"ok": True, "captures": rows}
+
+@app.delete("/net/delete_capture")
+def net_delete_capture(capture_id: str = Query(...)):
+    """
+    Delete all packets belonging to a specific capture_id from SQLite.
+
+    Note: the FAISS index is NOT rebuilt automatically — deleted vectors
+    leave gaps but do not cause incorrect results, they just waste a small
+    amount of memory. Call /rebuild_index after bulk deletions if needed.
+    """
+    conn = net_db()
+    cur  = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM net_memories WHERE capture_id = ?", (capture_id,))
+    count = cur.fetchone()[0]
+
+    if count == 0:
+        conn.close()
+        raise HTTPException(
+            status_code=404,
+            detail=f"Capture '{capture_id}' not found."
+        )
+
+    cur.execute("DELETE FROM net_memories WHERE capture_id = ?", (capture_id,))
+    conn.commit()
+    conn.close()
+
+    return {"ok": True, "capture_id": capture_id, "packets_deleted": int(count)}
 
 @app.get("/net/viz/top-ips")
 def net_viz_top_ips(capture_id: str, limit: int = 10):
@@ -624,6 +722,11 @@ def net_viz_flow(capture_id: str):
     conn.close()
     return [{"src": r[0], "port": r[1], "dst": r[2], "count": r[3]} for r in rows]
 
+
+#Returns all anomalous records for a capture. 
+#WhereFlow summary records (flow_record_type=flow_summary) are returned first
+#as they represent completed behavioral analysis and are more reliable
+#for detecting slow attacks like exfiltration and beaconing.
 @app.get("/net/anomalies")
 def net_anomalies(capture_id: str):
     conn = net_db()
@@ -632,11 +735,21 @@ def net_anomalies(capture_id: str):
         (capture_id,)
     ).fetchall()
     conn.close()
-    return [
-        json.loads(r[0])
-        for r in rows
-        if json.loads(r[0]).get("ml", {}).get("anomaly")
-    ]
+
+    flow_anomalies   = []
+    packet_anomalies = []
+
+    for r in rows:
+        meta = json.loads(r[0])
+        if not meta.get("ml", {}).get("anomaly"):
+            continue
+        if meta.get("flow_record_type") == "flow_summary":
+            flow_anomalies.append(meta)
+        else:
+            packet_anomalies.append(meta)
+
+    #Flow summaries first cause they represent complete behavioral evidence
+    return flow_anomalies + packet_anomalies
 
 @app.get("/net/stats")
 def net_stats():
@@ -645,10 +758,6 @@ def net_stats():
     conn.close()
     return {"ok": True, "count": count}
 
-
-# ---------------------------------------------------------------------------
-# Memory endpoints
-# ---------------------------------------------------------------------------
 @app.get("/search_memories")
 def search_memories(
     query: str,
@@ -872,14 +981,6 @@ def retrieve_memories(req: RetrieveReq):
     out.sort(key=lambda x: x["meta"]["score"], reverse=True)
     return {"memories": out}
 
-
-# ---------------------------------------------------------------------------
-# rebuild_faiss_index
-# FIX 1: fetchball() typo -> fetchall()
-# FIX 2: SELECT was missing the embedding BLOB column
-# FIX 3: wrong destructuring — row[0] was memory_id, not embedding bytes
-# FIX 4: stale comment said embeddings weren't stored — they are (as BLOB)
-# ---------------------------------------------------------------------------
 def rebuild_faiss_index() -> int:
     """
     Rebuild the memory FAISS index entirely from the embedding BLOBs
@@ -896,11 +997,11 @@ def rebuild_faiss_index() -> int:
     conn = db()
     cur  = conn.cursor()
 
-    # FIX: SELECT now fetches the embedding BLOB column
+    #FIXED: SELECT now fetches the embedding BLOB column
     cur.execute(
         "SELECT memory_id, embedding FROM memories ORDER BY faiss_row ASC"
     )
-    # FIX: fetchall() not fetchball()
+    #FIXED: fetchall() not fetchball()
     rows = cur.fetchall()
     conn.close()
 
@@ -908,7 +1009,7 @@ def rebuild_faiss_index() -> int:
     for memory_id, emb_bytes in rows:
         if emb_bytes is None:
             continue
-        # FIX: emb_bytes is now correctly row[1], not row[0]
+        #FIXED: emb_bytes is now correctly row[1], not row[0]
         emb = np.frombuffer(emb_bytes, dtype=np.float32).copy()
         emb = normalize(emb)
         idx.add(emb.reshape(1, -1))
@@ -919,7 +1020,5 @@ def rebuild_faiss_index() -> int:
     flush_mem_index()
 
     return added
-# ---------------------------------------------------------------------------
-# Startup
-# ---------------------------------------------------------------------------
+
 init_db()
