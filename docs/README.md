@@ -6,208 +6,188 @@
 ![Scikit-Learn](https://img.shields.io/badge/Scikit--Learn-1.4.0-F7931E.svg?style=flat&logo=scikit-learn&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
-## 📒 1. Abstract
+## 📒 Overview
 
-Project Sairene is a distributed Client–Server application designed for intelligent network forensic analysis and real-time threat hunting.
+**Project Sairene** is a distributed network forensic framework designed to identify stealthy cyberattacks in resource-constrained environments. By combining **Isolation Forest** statistical modeling with a **Heuristic Behavioral Override**, Sairene identifies "Low-and-Slow" exfiltration patterns and stealth scans that typically evade standard detection thresholds.
 
-The system transforms raw packet captures (PCAP/PCAPNG) into structured, queryable telemetry and augments them with Retrieval-Augmented Generation (RAG) to produce contextualized security insights.
+It combines:
 
-Instead of simply displaying packet data, Sairene introduces a semantic reasoning layer over network traffic, enabling analysts to interpret complex activity patterns with greater clarity and speed.
+- 🌲 **Isolation Forest anomaly detection**
+- 🧠 **Heuristic Behavioral Overrides**
+- 📚 **Retrieval-Augmented Generation (RAG)**
+- 🤖 **LLM-powered plain-English threat analysis**
 
-<p align="center">
-  <img src="screenshots/Greetings_Sairene.png" width="800" alt="Sairene says hello">
-</p>
+Sairene specializes in identifying:
 
------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-## 🚀 Latest Updates
-This version introduces significant architectural improvements to the Local Memory Service and the PCAP ingestion pipeline, focusing on high-performance vector search and robust data processing.
+- Low-and-Slow Data Exfiltration  
+- Stealth Reconnaissance Scans  
+- Beaconing / Callback Malware Traffic  
+- Suspicious Flows Hidden Below Threshold Alerts
 
-### 🧠 Performance & Scalability
-- RAM-Based Vector Search: The FAISS index is now managed as a Singleton and cached in memory. This eliminates the overhead of reading the index from disk for every query, ensuring sub-millisecond search times regardless of dataset size.
+---
 
-- Batch Database Retrieval: Replaced "N+1" query patterns with optimized batch SQL requests. When retrieving search results, the system now fetches all metadata in a single database trip rather than multiple individual queries.
+## 🧬 Core Philosophy
 
-- SQL Indexing: Added explicit indices on frequently searched columns like faiss_row and capture_id to maintain speed as the database grows.
+> Detect what blends in.  
+> Explain what machines ignore.  
+> Surface what attackers hide.
 
-### 🛠️ Stability & Bug Fixes
-- ICMP/DNS Logic Separation: Fixed a critical bug in the PCAP ingester where DNS parsing was incorrectly nested inside ICMP logic. The system can now process ICMP packets (pings) without crashing and correctly identifies DNS queries across UDP and TCP.
+---
 
-- Database Schema Alignment: Resolved a mismatch in the init_db function to ensure the embedding BLOB column is correctly created and populated.
+## 🏗️ Architecture
 
-- Safe Shutdowns: Implemented FastAPI shutdown handlers to ensure the in-memory FAISS index is successfully flushed to disk whenever the service stops.
+```mermaid
+graph TD
 
-- Reliable Index Rebuilding: Fixed a syntax error (fetchball typo) in the index maintenance tool, allowing for safe index reconstruction from the SQLite database.
+subgraph Client [Analyst Workstation - Windows]
+    CLI[chat_with_memory.py]
+    MC[memory_client.py]
+    LLM[Ollama - Qwen2.5]
+    VIZ[Plotly Visualizations]
 
-### 📡 Enhanced Network Intelligence
-Improved DNS Visibility: The ingestion engine now reliably extracts and stores DNS query names. This provides much deeper context for security analysis and semantic searching of network logs.
+    CLI --> MC
+    CLI --> LLM
+    CLI --> VIZ
+end
 
-## ✍🏻 What is next:
-Im thinking of changing the architecture of the app from Python to Rust for speed
+subgraph Server [Memory Engine - Linux / Proxmox]
+    API[app.py]
+    DB[(SQLite + FAISS)]
+    ING[net_pcap_ingest.py]
+    FT[flow_tracker.py]
+    ML[ml_anomaly.py]
+    TRAIN[train_anomaly.py]
 
------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    API --> DB
+    ING --> FT
+    ING --> ML
+    ML --> API
+    TRAIN --> DB
+end
 
-## 🏗️ 2. System Architecture
+MC --> API
+PCAP[Raw PCAP / PCAPNG] --> ING
+```
+## 📂 Components
 
-Project Sairene follows a distributed architecture separating ingestion, storage, and reasoning from analyst interaction.
+### 🧠 Server Side
 
-      ┌──────────────┐
-      │     PCAP     │
-      └──────┬───────┘
-             │
-             ▼
-      ┌──────────────────────────┐
-      │ Server (Ingestion & API) │
-      └──────┬───────────────────┘
-             │
-             ▼
-      ┌──────────────────────────┐
-      │ Structured Network Memory│
-      └──────┬───────────────────┘
-             │
-             ▼  
-      ┌───────────────────────────────────────┐
-      │ML Anomaly Detection (Isolation Forest)│
-      └──────┬────────────────────────────────┘
-             │
-             ▼
-      ┌──────────────────────────┐
-      │   LLM Reasoning (RAG)    │
-      └──────┬───────────────────┘
-             │
-             ▼
-      ┌──────────────────────────┐
-      │ Client & Visualizations  │
-      └──────────────────────────┘
+| File                 | Purpose                                   |
+| -------------------- | ----------------------------------------- |
+| `app.py`             | FastAPI service, FAISS memory, SQLite API |
+| `net_pcap_ingest.py` | Batch packet parser using Scapy           |
+| `flow_tracker.py`    | Bidirectional conversation tracker        |
+| `ml_anomaly.py`      | Hybrid anomaly detection engine           |
+| `train_anomaly.py`   | Offline model retraining                  |
 
-Server (Debian / Proxmox):
+### 👁️ Client Side
 
-  - PCAP ingestion
-  - Parsing via Scapy
-  - Structured metadata extraction
-  - Storage in SQLite (JSON-enabled)
-  - REST API built with FastAPI
+| File                  | Purpose                     |
+| --------------------- | --------------------------- |
+| `chat_with_memory.py` | Main analyst CLI            |
+| `memory_client.py`    | HTTP bridge to server       |
+| `sysinfo.py`          | Hardware / telemetry module |
+| `animation.py`        | Startup UX / persona layer  |
+
+## 🔍 Detection Methodology
+
+**Hybrid Detection Gate**
+
+Sairene uses a two-pass scoring model:
+
+***Pass 1: Statistical Detection***
+
+**Isolation Forest evaluates a 20-feature vector including:**
+
+- Flow duration
+- Byte ratios
+- Port rarity
+- Packet cadence
+- Burst patterns
+
+***Pass 2: Behavioral Override***
+
+**Rules specifically target:**
+
+*Low-and-Slow Exfiltration:*
+- Duration > 30 seconds
+- Bitrate < 5000 bps
+- Non-standard ports
+- Sustained outbound leakage
   
-The server acts as the persistent network memory core.
+*Stealth Recon:*
+- Sparse probing
+- Sequential host touches
+- Delayed packet cadence
+- Low-noise scanning behavior
 
-Client (Windows 11):
+## ⏱️ Bidirectional IAT Tracking
 
-  - CLI-based analyst interface
-  - Interactive visualizations using Plotly
-  - Local LLM orchestration via Ollama
+Unlike standard sniffers, Sairene removes ACK-only timing distortion.
 
-The client is responsible for:
+This enables accurate detection of:
 
-  - 1. Command execution
-  - 2. Data visualization
-  - 3. Context-aware querying
-  - 4. LLM interaction
+- Beacon intervals
+- Malware sleep-jitter callbacks
+- Automated schedulers
+- Fake background service traffic
 
+## 💻 Commands
 
-## 🔑 3. Key Features & Methodology
-  ### A. Retrieval-Augmented Generation (RAG)
+| Command             | Function                |
+| ------------------- | ----------------------- |
+| `/netimport <file>` | Import PCAP capture     |
+| `/netask <query>`   | Query memory with RAG   |
+| `/netviz --anom`    | Anomaly timeline        |
+| `/netviz --flow`    | Traffic Sankey diagram  |
+| `/netviz --top-ips` | Top IP chart            |
+| `/netstats`         | Capture summary         |
+| `/neofetch`         | Client/server telemetry |
 
-  Command: /netask <query>
-  
-  The system does not operate as a generic chatbot.
-  
-  - Workflow:
-  
-    - User submits a security-related query.
-    - The server retrieves relevant packet records from the database.
-    - Structured results are injected into the LLM context.
-    - The LLM generates an answer grounded in actual capture data.
+## 📥 Installation
+
+***Linux / Proxmox Server***
+
+    sudo apt update
+    sudo apt install tshark -y
     
-  This prevents hallucination and ensures that reasoning remains evidence-based.
-  
-  LLM Model:
-  
-    Qwen (via Ollama)
-
-  <p align="center">
-    <img src="screenshots/netask_example.png" width="900" alt="netask_example">
-  </p>
-
-  ### B. Structured Behavioral Analysis
-
-  Sairene converts packet-level telemetry into structured, queryable representations.
-  
-  Analytical capabilities include:
-  
-  - **Who is talking to whom:** Maps out the path from the starting device to the destination.
-  - **What "doors" are being used:** Tracks which ports (like web browsing) are active.Port usage distribution
-  - **Where the traffic is piling up:** Pinpoints areas where the network is getting crowded.
-  - **Who the "loudest" users are:** Quickly identifies the devices using the most data.
-  - **What languages are being spoken:** Breaks down which protocols (the rules for communication) are being used most often.
+    pip install fastapi uvicorn scapy faiss-cpu sentence-transformers joblib scikit-learn
     
-  This allows analysts to move from raw packets to interaction-level reasoning.
+    export NET_DATA_DIR="/var/lib/memory_service/net"
+    
+    uvicorn app:app --host 0.0.0.0 --port 8000
 
-  ### C. Interactive Visualizations
+***Windows Analyst Client***
 
-  Visual abstractions enhance interpretability.
+    ollama pull qwen2.5
+    
+    pip install requests pandas plotly colorama psutil
+
+  Update:
   
-  Sankey Diagrams
-  
-    Source → Port → Destination flow modeling
+    BASE_URL = "http://YOUR_SERVER_IP:8000"
 
-  <p align="center">
-    <img src="screenshots/Sankey_example.png" width="800" alt="Sankey_example">
-  </p>
-  
-  Dynamic Bar Charts
-  
-    Top talkers
-    Protocol distribution
-    Real-time traffic statistics
+  Run:
 
-  <p align="center">
-    <img src="screenshots/top_ips_example.png" width="700" alt="top_ips_example">
-  </p>
-  
-  All visualizations are rendered via Plotly for interactive exploration.
+    python chat_with_memory.py
 
-  ### D. Machine Learning Anomaly Detection (Isolation Forest)
-  Sairene uses an **Isolation Forest** algorithm to identify outliers in network traffic without requiring pre-labeled attack signatures.
-  - **Logic:** The model isolates anomalies based on feature deviations (for example, unusual port-to-IP fan-out, packet frequency).
-  - **Threat Scoring:** Each flow is assigned a score. Sairene categorizes these into **CRITICAL, HIGH, MEDIUM,** or **LOW** threat levels based on statistical distance.
+## 🚀 Why Sairene Matters
 
-  <p align="center">
-    <img src="screenshots/anomaly_command.png" width="800" alt="anomaly_command">
-  </p>
-  
-## ⌨️ 4. Commands & Usage
+Traditional IDS systems detect loud attacks.
 
-  | Command                | Description                                                                 |
-  | ---------------------- | --------------------------------------------------------------------------- |
-  | `/netimport <file>`    | Parses a PCAP/PCAPNG file and synchronizes it with the server database.     |
-  | `/netstats`            | Displays high-level statistics of the current capture.                      |
-  | `/netviz --anom`| Runs ML detection and generates an interactive anomaly timeline.       |
-  | `/netviz --flow`       | Generates an interactive Sankey diagram of network flows.                   |
-  | `/netviz --top-ips`    | Generates an interactive Bar graph of the top 10 present IPs.               |
-  | `/netask [capture_id]` | Performs a RAG-based forensic analysis using Qwen 2.5.                      |
-  | `/neofetch`            | Displays local and server system telemetry.                                 |
+Modern attackers stay quiet.
 
-  <p align="left">
-    <img src="screenshots/net_command.png" width="400" alt="net_command">
-  </p>
+Sairene focuses on:
 
-## 📥 5. Installation & Setup
+- Subtle behavioral anomalies
+- Statistical rarity
+- Human-readable explanations
+- Lightweight deployment
+- Distributed investigation workflows
 
-  - Server Side:
+<div align="center">
+🛡️ Sairene
 
-    - 1. Install TShark
-         
-    - 2. Install dependencies:
-         pip install -r server/requirements_server.txt
-         
-    - 3. Run the FastAPI server:
-         uvicorn app:app --host 0.0.0.0 --port 8000
+Silent Detection for Quiet Threats.
 
-  - Client Side:
-
-    - 1. Install Ollama
-         
-    - 2. Pull the LLM model:
-         ollama pull qwen2.5
-         
-    - 3. Install client dependencies:
-         pip install -r client/requirments_client.txt
+</div>
