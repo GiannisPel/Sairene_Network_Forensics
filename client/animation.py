@@ -130,13 +130,13 @@ def draw_frame(frame_lines):
     sys.stdout.flush()
 
 
-# Speed / randomness
+#Speed / randomness
 frame_delay = 0.12
 min_idle = 5
 max_idle = 15
 
 def animate_once(frame_delay: float = 0.12):
-    sys.stdout.write("\033[?7l")  # disable wrap
+    sys.stdout.write("\033[?7l")  #disable wrap
     sys.stdout.flush()
 
     try:
