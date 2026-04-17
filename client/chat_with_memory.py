@@ -19,10 +19,10 @@ from typing import List, Dict, Any
 
 #Config
 DISK_PATH = r"S:\\"  #Drive to show in /neofetch
-OLLAMA_URL = "http://127.x.x.x:11434/api/chat"
+OLLAMA_URL = "http://127.0.0.1:11434/api/chat"
 CHAT_MODEL = "qwen2.5:latest"
 CONVERSATION_ID = "myproject"
-BASE_URL = "http://192.168.x.x:8000"
+BASE_URL = "http://192.168.1.125:8000"
 
 init(autoreset=True)
 
@@ -49,14 +49,14 @@ ASCII_ART = r"""
                                %
 """
 
-ZETA_BANNER = r"""
+SAIRENE_BANNER = r"""
 
-███████╗███████╗████████╗ █████╗
-╚══███╔╝██╔════╝╚══██╔══╝██╔══██╗
-  ███╔╝ █████╗     ██║   ███████║
- ███╔╝  ██╔══╝     ██║   ██╔══██║
-███████╗███████╗   ██║   ██║  ██║
-╚══════╝╚══════╝   ╚═╝   ╚═╝  ╚═╝
+███████╗ █████╗ ██╗██████╗ ███████╗███╗   ██╗███████╗
+██╔════╝██╔══██╗██║██╔══██╗██╔════╝████╗  ██║██╔════╝
+███████╗███████║██║██████╔╝█████╗  ██╔██╗ ██║█████╗  
+╚════██║██╔══██║██║██╔══██╗██╔══╝  ██║╚██╗██║██╔══╝  
+███████║██║  ██║██║██║  ██║███████╗██║ ╚████║███████╗
+╚══════╝╚═╝  ╚═╝╚═╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═══╝╚══════╝
 
 """.strip("\n")
 
@@ -94,7 +94,7 @@ ERROR_BANNER = r"""
 
 NET_HELP = """
 \n
-NETWORK FORENSIC KNOWLEDGE BASE, made by GiannisPel.
+NETWORK FORENSIC KNOWLEDGE BASE, made by Mpakalogatos.
 
 Net commands:
   /netadd <text>
@@ -112,7 +112,14 @@ Net commands:
 
   /netask [capture_id] | <question>
       Ask questions about imported network data.
-      Example: /net ask test1.pcapng | what protocols are present?
+      Example: /netask test1.pcapng | what protocols are present?
+
+  /netcaptures
+      List all captures stored in the database with packet counts.
+
+  /netdel <capture_id>
+      Delete a capture and all its packets from the database.
+      Example: /netdel Check_for_activity.pcapng
 
   /netstats
       Show quick stats for the current / selected capture.
@@ -151,7 +158,7 @@ def color_block(text: str, color=Fore.CYAN) -> str:
     return "\n".join(f"{color}{line}{Style.RESET_ALL}" for line in text.splitlines())
 
 #Helpers
-def start_thinking_spinner(label: str = "Zeta: Thinking") -> Any:
+def start_thinking_spinner(label: str = "Sairene: Thinking") -> Any:
     """
     Starts a background spinner that updates the terminal line.
     Returns stop() that stops it and clears the line.
@@ -180,7 +187,7 @@ def start_thinking_spinner(label: str = "Zeta: Thinking") -> Any:
     return stop
 
 
-def ollama_chat_stream(messages: List[Dict[str, str]], model: str, timeout: int = 300) -> str:
+def ollama_chat_stream(messages: List[Dict[str, str]], model: str, timeout: int = 900) -> str:
     """
     Streams tokens from Ollama and prints them as they arrive.
     Returns the full assistant reply as a string.
@@ -217,11 +224,9 @@ def ollama_chat_stream(messages: List[Dict[str, str]], model: str, timeout: int 
     print()  #Newline after streaming finishes
     return full_text
 
-def extract_protocols_from_text(s: str) -> Counter:
-    """
-    Extract protocol tokens from Scapy-style summary strings like:
-    'Ether / IP / TCP 192.168.x.x:55191 > 192.168.x.x:8006 RA'
-    """
+#Extract protocol tokens from Scapy-style summary strings like:
+#Ether / IP / TCP src_ip:src_port > dst_ip:dst_port RA
+def extract_protocols_from_text(s: str) -> Counter: 
     c = Counter()
     if not s:
         return c
@@ -419,54 +424,79 @@ def viz_anomalies_plotly(anomalies, capture_id):
     if not anomalies:
         return
 
-    #Convert to dataframe to be easier
     df_list = []
     for a in anomalies:
-        df_list.append({
-            "timestamp": a.get("timestamp"), 
-            "score": a.get("ml", {}).get("score", 0),
-            "src_ip": a["layers"]["network"].get("src_ip"),
-            "dst_port": a["layers"]["transport"].get("dst_port"),
-            "level": threat_level(a.get("ml", {}).get("score"))
-        })
-    
-    df = pd.DataFrame(df_list)
-    df['timestamp'] = pd.to_datetime(df['timestamp'])
+        #FIXED: timestamp is nested under a["packet"]["timestamp"], not top level
+        ts      = a.get("packet", {}).get("timestamp")
+        score   = a.get("ml", {}).get("score", 0)
+        src_ip  = a["layers"]["network"].get("src_ip", "?")
+        dst_port= a["layers"]["transport"].get("dst_port")
+        level   = threat_level(score)
 
-    #Initializing colors for every level of threat
+        df_list.append({
+            "timestamp": ts,
+            "score":     score,
+            "src_ip":    src_ip,
+            "dst_port":  dst_port,
+            "level":     level,
+        })
+
+    df = pd.DataFrame(df_list)
+
+    df["timestamp"] = pd.to_datetime(
+        df["timestamp"], unit="s", utc=True, errors="coerce"
+    )
+
+    #Drop rows where timestamp couldnt be parsed
+    invalid = df["timestamp"].isna().sum()
+    if invalid > 0:
+        print(f"  Warning: {invalid} anomalies had unparseable timestamps and were dropped from the chart.")
+    df = df.dropna(subset=["timestamp"])
+
+    if df.empty:
+        print("No anomalies with valid timestamps to plot.")
+        return
+
     color_map = {
         "CRITICAL": "red",
-        "HIGH": "orange",
-        "MEDIUM": "yellow",
-        "LOW": "cyan"
+        "HIGH":     "orange",
+        "MEDIUM":   "yellow",
+        "LOW":      "cyan",
     }
 
     fig = go.Figure()
 
-    #Adding points per threat level
     for level, color in color_map.items():
-        sub_df = df[df['level'] == level]
+        sub_df = df[df["level"] == level]
         if not sub_df.empty:
             fig.add_trace(go.Scatter(
-                x=sub_df['timestamp'],
-                y=sub_df['score'],
-                mode='markers',
+                x=sub_df["timestamp"],
+                y=sub_df["score"],
+                mode="markers",
                 name=level,
-                marker=dict(color=color, size=10, symbol='diamond'),
-                text=[f"IP: {r['src_ip']}<br>Port: {r['dst_port']}" for _, r in sub_df.iterrows()],
-                hovertemplate="<b>%{text}</b><br>Score: %{y}<br>Time: %{x}<extra></extra>"
+                marker=dict(color=color, size=10, symbol="diamond"),
+                text=[
+                    f"IP: {r['src_ip']}<br>Port: {r['dst_port']}"
+                    for _, r in sub_df.iterrows()
+                ],
+                hovertemplate=(
+                    "<b>%{text}</b><br>"
+                    "Score: %{y:.4f}<br>"
+                    "Time: %{x}<extra></extra>"
+                ),
             ))
 
-    #thresholds
-    fig.add_hline(y=-0.20, line_dash="dot", line_color="red", annotation_text="Critical Threshold")
-    fig.add_hline(y=-0.06, line_dash="dot", line_color="orange")
+    fig.add_hline(y=-0.20, line_dash="dot", line_color="red",
+                  annotation_text="Critical Threshold")
+    fig.add_hline(y=-0.06, line_dash="dot", line_color="orange",
+                  annotation_text="Medium Threshold")
 
     fig.update_layout(
         title=f"Anomaly Score Timeline - {capture_id}",
         xaxis_title="Time",
-        yaxis_title="Isolation Forest Score (lower is more anomalous)",
+        yaxis_title="Isolation Forest Score (lower = more anomalous)",
         template="plotly_dark",
-        hovermode="closest"
+        hovermode="closest",
     )
 
     fig.show()
@@ -492,7 +522,7 @@ def build_system_messages(memory_block: str, wiki_block: str) -> List[Dict[str, 
 
     return messages
 
-print(color_block(ZETA_BANNER, Fore.GREEN))
+print(color_block(SAIRENE_BANNER, Fore.GREEN))
 #Chat
 def main():
     print(f"Model: {CHAT_MODEL}")
@@ -515,7 +545,7 @@ def main():
             print("Commands: /remember <text>, /forget <text>, /net, /neofetch, /showanims | /exit\n")
             continue
 
-        # /neofetch
+        #/neofetch
         if user_text.lower() in {"/neofetch", "neofetch"}:
             animate_once()
             mem_size = None
@@ -539,7 +569,7 @@ def main():
             print()
             continue
 
-        # /remember
+        #/remember
         if user_text.lower().startswith("/remember "):
             text = user_text[len("/remember "):].strip()
             if text:
@@ -547,7 +577,7 @@ def main():
                 print(f"Saved memory: {out.get('memory_id')}\n")
             continue
 
-        # /forget (search then delete by id)
+        #/forget
         if user_text.lower().startswith("/forget "):
             query = user_text[len("/forget "):].strip()
 
@@ -605,7 +635,7 @@ def main():
                     "  1) NET_BANNER\n"
                     "  2) NET_ERROR\n"
                     "  3) cat_logo\n"
-                    "  4) ZETA_BANNER\n"
+                    "  4) SAIRENE_BANNER\n"
                     "  5) Exit\n"
                 )
                 choice = input("Choose (1-5): ").strip()
@@ -617,7 +647,7 @@ def main():
                 elif choice == "3": 
                     print(ASCII_ART)
                 elif choice == "4":
-                    print(color_block(ZETA_BANNER, Fore.GREEN))
+                    print(color_block(SAIRENE_BANNER, Fore.GREEN))
                 elif choice == "5":
                     print("Exiting /showanims")
                     break
@@ -632,136 +662,190 @@ def main():
         cmd = user_text.strip()
         cmd_l = cmd.lower()
         
-        #NET COMMANDS (order matters)
+        #NET COMMANDS
         
         cmd = user_text.strip()
         cmd_l = cmd.lower()
         
         if user_text.lower().startswith("/netask "):
             raw = user_text[len("/netask "):].strip()
-        
+
             capture_id = None
-            question = raw
-        
-            #Allow: "/net ask test1.pcapng | what protocols are present?"
+            question   = raw
+
             if "|" in raw:
                 left, right = raw.split("|", 1)
                 capture_id = left.strip() or None
-                question = right.strip()
-        
+                question   = right.strip()
+
             if not question:
-                print("Usage: /netvizask [capture_id |] <question>\n")
+                print("Usage: /netask [capture_id |] <question>\n")
                 continue
-        
-            #Retrieve MORE than you show.
-            user_top_k = 25
-            retrieve_top_k = max(80, user_top_k * 5)
-        
+
+            #Queries having words like: weird, suspicious cant indicate to a specific semantic search
+            #So having certain keywords, direct the sources to the ML anomaly model and take sources also from there
+            SECURITY_KEYWORDS = {
+                "malicious", "anomal", "attack", "scan", "threat", "suspicious",
+                "intrusion", "exploit", "flood", "beacon", "exfiltrat", "tunnel",
+                "poison", "spoof", "hijack", "brute", "ddos", "dos", "syn",
+                "rst", "port scan", "recon", "lateral", "c2", "command",
+                "malware", "virus", "hack", "breach", "unusual", "weird",
+                "danger", "risk", "alert", "flag", "detect"
+            }
+            q_lower = question.lower()
+            is_security_question = any(kw in q_lower for kw in SECURITY_KEYWORDS)
+
+            #Semantic retrieval (always runs)
+            retrieve_top_k = 200
             hits = net_retrieve(
                 question,
                 capture_id=capture_id,
                 top_k=retrieve_top_k,
-                min_score=0.0
+                min_score=0.0,
             )
-        
-            print(f"\nDEBUG net hits: {len(hits)}")
+
+            print(f"\nDEBUG semantic hits: {len(hits)}")
             for h in hits[:5]:
-                print(f"- {h['score']:.3f} {h.get('capture_id')} :: {h.get('text','')[:120]}")
+                print(f"  score={h['score']:.3f} [{h.get('capture_id','')}] "
+                      f"{h.get('text','')[:100]}")
             print()
-        
-            if not hits:
-                print("No network knowledge found.\n")
-                hits = net_retrieve(question, capture_id=capture_id, top_k=retrieve_top_k, min_score=-1.0)
-                continue
-        
-            #Deterministic extraction from retrieved packet summaries
+
+            #Anomaly retrieval (runs when question is triggerred by keywords)
+            #Pulls flagged packets directly from meta_json anomaly data
+            anomaly_block = ""
+            if is_security_question and capture_id:
+                try:
+                    anomalies = get_anomalies(capture_id)
+                    print(f"DEBUG anomaly hits: {len(anomalies)}")
+
+                    if anomalies:
+                        anom_lines = []
+                        for a in anomalies[:40]:  #cap at 40 for context window
+                            net_l   = a.get("layers", {}).get("network",   {})
+                            trans_l = a.get("layers", {}).get("transport", {})
+                            ml      = a.get("ml",     {})
+                            flow    = a.get("flow",   {})
+
+                            src  = f"{net_l.get('src_ip')}:{trans_l.get('src_port')}"
+                            dst  = f"{net_l.get('dst_ip')}:{trans_l.get('dst_port')}"
+                            score   = ml.get("score", 0.0)
+                            level   = threat_level(score)
+                            reasons = ml.get("reasons", [])
+
+                            line = (
+                                f"[{level}] {src} → {dst} "
+                                f"score={score:.3f} proto={trans_l.get('protocol','?')}"
+                            )
+                            if reasons:
+                                line += " | " + "; ".join(reasons)
+
+                            #Include flow stats if they show scanning behavior
+                            udp = flow.get("unique_dst_ports", 0)
+                            if udp > 10:
+                                line += f" | unique_dst_ports={udp}"
+
+                            anom_lines.append(line)
+
+                        anomaly_block = (
+                            f"ANOMALY DETECTION RESULTS ({len(anomalies)} packets flagged):\n"
+                            + "\n".join(f"- {l}" for l in anom_lines)
+                        )
+                    else:
+                        anomaly_block = "ANOMALY DETECTION RESULTS: No anomalies flagged in this capture."
+
+                except Exception as e:
+                    anomaly_block = f"ANOMALY DETECTION RESULTS: Could not retrieve ({e})"
+
+            elif is_security_question and not capture_id:
+                anomaly_block = (
+                    "ANOMALY DETECTION RESULTS: No capture_id specified. "
+                    "Use '/netask <capture_id> | <question>' to get anomaly data for a specific capture."
+                )
+
+            #Deterministic NET SUMMARY from semantic hits
             proto_counts = Counter()
-            ip_counts = Counter()
-            flow_counts = Counter()
-            port_counts = Counter()
-        
+            ip_counts    = Counter()
+            flow_counts  = Counter()
+            port_counts  = Counter()
+
             for h in hits:
                 t = h.get("text", "")
                 proto_counts.update(extract_protocols_from_text(t))
-        
                 ep = extract_endpoints_from_text(t)
                 if ep:
                     src, srcp, dst, dstp = ep
                     ip_counts[src] += 1
                     ip_counts[dst] += 1
                     flow_counts[(src, dst)] += 1
-                    if srcp is not None:
-                        port_counts[srcp] += 1
-                    if dstp is not None:
-                        port_counts[dstp] += 1
-        
-            #Build a compact summary that the LLM can reliably answer from
+                    if srcp is not None: port_counts[srcp] += 1
+                    if dstp is not None: port_counts[dstp] += 1
+
             top_protocols = proto_counts.most_common(12)
-            top_ips = ip_counts.most_common(10)
-            top_flows = flow_counts.most_common(8)
-            top_ports = port_counts.most_common(10)
-        
+            top_ips       = ip_counts.most_common(10)
+            top_flows     = flow_counts.most_common(8)
+            top_ports     = port_counts.most_common(10)
+
             summary_lines = []
             if capture_id:
                 summary_lines.append(f"Capture filter: {capture_id}")
-        
             if top_protocols:
                 summary_lines.append(
-                    "Protocols (approx counts from retrieved packets): " +
-                    ", ".join(f"{p}={n}" for p, n in top_protocols)
+                    "Protocols: " + ", ".join(f"{p}={n}" for p, n in top_protocols)
                 )
             if top_ips:
                 summary_lines.append(
-                    "Top IPs (approx): " +
-                    ", ".join(f"{ip}({n})" for ip, n in top_ips)
+                    "Top IPs: " + ", ".join(f"{ip}({n})" for ip, n in top_ips)
                 )
             if top_ports:
                 summary_lines.append(
-                    "Top ports (approx): " +
-                    ", ".join(f"{port}({n})" for port, n in top_ports)
+                    "Top ports: " + ", ".join(f"{p}({n})" for p, n in top_ports)
                 )
             if top_flows:
                 summary_lines.append(
-                    "Top flows (src -> dst, approx): " +
-                    ", ".join(f"{a} -> {b} ({n})" for (a, b), n in top_flows)
+                    "Top flows: " + ", ".join(f"{a}→{b}({n})" for (a,b),n in top_flows)
                 )
-        
-            net_summary_block = "NET SUMMARY (computed from retrieved packets):\n" + "\n".join(
-                f"- {line}" for line in summary_lines
+
+            net_summary_block = "NET SUMMARY (from retrieved packets):\n" + "\n".join(
+                f"- {l}" for l in summary_lines
             )
-        
-            #Keep only the best packet lines to show the model (avoid flooding it)
-            #Cap at 30
-            top_for_llm = hits[:30]
-            net_context_block = "NETWORK CONTEXT (pcap-derived packet summaries):\n" + "\n".join(
-                f"- [{h.get('capture_id','')}] {h.get('text','')}" for h in top_for_llm
+
+            #Cap packet context at 30 to avoid flooding the context window
+            net_context_block = "NETWORK CONTEXT (packet summaries):\n" + "\n".join(
+                f"- [{h.get('capture_id','')}] {h.get('text','')}"
+                for h in hits[:30]
             )
-        
-            messages = [
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a local AI assistant.\n"
-                        "You will receive NET SUMMARY (computed) and NETWORK CONTEXT (packet summaries).\n"
-                        "Use NET SUMMARY as primary truth for 'what protocols/endpoints/ports are present'.\n"
-                        "Use packet summaries for supporting details.\n"
-                        "If the question is 'what happened', provide a high-level narrative: protocols, endpoints, directionality, and notable events.\n"
-                        "Do not invent protocols not present in NET SUMMARY.\n"
-                    ),
-                },
-                {"role": "system", "content": net_summary_block},
-                {"role": "system", "content": net_context_block},
-            ]
-        
+
+            #System promp where security questions get explicit guidance
+            base_instructions = (
+                "You are a network forensics AI assistant.\n"
+                "You will receive NET SUMMARY, NETWORK CONTEXT, and optionally "
+                "ANOMALY DETECTION RESULTS.\n"
+                "Use NET SUMMARY as primary truth for protocols/endpoints/ports.\n"
+                "Use ANOMALY DETECTION RESULTS as primary truth for security questions — "
+                "these are computed scores and reasons, not guesses.\n"
+                "When anomalies are present, report: which IPs are involved, "
+                "what the threat level is, what behavior was detected, and your "
+                "assessment of what likely happened.\n"
+                "Do not invent protocols or behaviors not present in the provided data.\n"
+                "192.168.1.7 is USER'S LOCAL IP ADDRESS.\n"
+                "192.168.1.50 is where THIS SERVICE is hosted.\n"
+                "192.168.1.125 is where THE MEMORY of THE SERVICE is hosted."
+            )
+
+            messages = [{"role": "system", "content": base_instructions}]
+            messages.append({"role": "system", "content": net_summary_block})
+            if anomaly_block:
+                messages.append({"role": "system", "content": anomaly_block})
+            messages.append({"role": "system", "content": net_context_block})
             messages.extend(history)
             messages.append({"role": "user", "content": question})
-        
-            print("\nZeta: ", end="", flush=True)
+
+            print("\nSairene: ", end="", flush=True)
             reply = ollama_chat_stream(messages, model=CHAT_MODEL)
             print()
-        
-            history.append({"role": "user", "content": question})
-            history.append({"role": "assistant", "content": reply})
+
+            history.append({"role": "user",      "content": question})
+            history.append({"role": "assistant",  "content": reply})
             continue
 
         if cmd_l.startswith("/netviz"):
@@ -789,7 +873,7 @@ def main():
 
                     #Visualiazation for analysis
                     if anomalies:
-                        print(f"\nZeta: Generating anomaly timeline for {capture_id}...")
+                        print(f"\nSairene: Generating anomaly timeline for {capture_id}...")
                         viz_anomalies_plotly(anomalies, capture_id)
                     
                 else:
@@ -800,44 +884,118 @@ def main():
 
             continue
 
-        # /net import <file path>
         if cmd_l.startswith("/netimp "):
             raw_path = cmd[len("/netimp "):].strip()
             raw_path = strip_quotes(raw_path)
-        
+
             if not raw_path:
                 print("Usage: /netimp <path_to_pcap_or_pcapng>\n")
                 continue
-        
+
             if not os.path.isfile(raw_path):
                 print(f"File not found: {raw_path}\n")
                 continue
-        
-            print("Importing pcap. This can take time (CPU-heavy on the LXC)...")
-        
-            stop_spinner = start_thinking_spinner("Zeta: Importing")
+
+            print(color_block(NET_BANNER, Fore.CYAN))
+            print(f"Importing: {os.path.basename(raw_path)}\n")
+
             try:
-                out = net_import_pcap(raw_path, timeout=1800.0)  # 30 minutes
+                from tqdm import tqdm
+
+                url = f"{BASE_URL}/net/import_pcap_stream"
+
+                with open(raw_path, "rb") as f:
+                    files = {
+                        "file": (os.path.basename(raw_path), f, "application/octet-stream")
+                    }
+
+                    with requests.post(
+                        url,
+                        files=files,
+                        stream=True,
+                        timeout=(30, 7200),
+                    ) as resp:
+                        resp.raise_for_status()
+
+                        bar   = None
+                        total = 0
+
+                        for raw_line in resp.iter_lines(decode_unicode=True):
+                            if not raw_line:
+                                continue
+
+                            parts = raw_line.strip().split()
+
+                            if parts[0] == "TOTAL":
+                                total = int(parts[1])
+                                bar = tqdm(
+                                    total=total,
+                                    unit="pkt",
+                                    desc="Importing PCAP",
+                                    bar_format=(
+                                        "{desc}: {percentage:3.0f}%"
+                                        "|{bar:30}| "
+                                        "{n_fmt}/{total_fmt} "
+                                        "[{elapsed}<{remaining}, {rate_fmt}]"
+                                    ),
+                                    colour="cyan",
+                                )
+
+                            elif parts[0] == "PROGRESS" and bar is not None:
+                                current = int(parts[1])
+                                #Clamp to total, flow summary pass can push
+                                #added above the original packet count
+                                bar.n = min(current, total)
+                                #Switch label when move into flow analysis
+                                if current >= total:
+                                    bar.set_description("Analysing flows")
+                                bar.refresh()
+
+                            elif parts[0] == "DONE":
+                                stored = int(parts[1])
+                                cap_id = parts[2] if len(parts) > 2 else "?"
+                                if bar is not None:
+                                    bar.n = total
+                                    bar.set_description("Done")
+                                    bar.refresh()
+                                    bar.close()
+                                print(
+                                    f"\n{Fore.GREEN}Done.{Style.RESET_ALL} "
+                                    f"{stored} records stored "
+                                    f"(packets + flow summaries) — "
+                                    f"capture_id: {cap_id}\n"
+                                )
+
+                            elif parts[0] == "ERROR":
+                                if bar is not None:
+                                    bar.close()
+                                msg = " ".join(parts[1:])
+                                print(color_block(ERROR_BANNER, Fore.RED))
+                                print(f"Import failed on server: {msg}\n")
+
             except requests.exceptions.Timeout:
-                stop_spinner()
                 print(color_block(ERROR_BANNER, Fore.RED))
                 print("Import timed out on the client. The server may still be working.\n")
-                continue
+            except ImportError:
+                #packet tqdm not installed go back to old spinner
+                print("tqdm not found, falling back to spinner. "
+                      "Install it with: pip install tqdm\n")
+                stop_spinner = start_thinking_spinner("Sairene: Importing")
+                try:
+                    out = net_import_pcap(raw_path, timeout=1800.0)
+                    stop_spinner()
+                    print(f"Imported: {out}\n")
+                except Exception as e:
+                    stop_spinner()
+                    print(color_block(ERROR_BANNER, Fore.RED))
+                    print(f"Import failed: {e}\n")
             except Exception as e:
-                stop_spinner()
                 print(color_block(ERROR_BANNER, Fore.RED))
                 print(f"Import failed: {e}\n")
-                continue
-            finally:
-                try:
-                    stop_spinner()
-                except Exception:
-                    pass
-        
-            print(f"Imported: {out}\n")
+
             continue
 
-        # /netstats
+        #/netstats
         if cmd_l in {"/netstats"}:
             try:
                 out = net_stats()
@@ -847,7 +1005,90 @@ def main():
                 print(f"Failed to fetch net stats: {e}\n")
             continue
 
-        # 4) add
+        #/netcaptures
+        if cmd_l in {"/netcaptures"}:
+            try:
+                r = requests.get(f"{BASE_URL}/net/captures", timeout=15)
+                r.raise_for_status()
+                captures = r.json().get("captures", [])
+                if not captures:
+                    print("No captures stored.\n")
+                else:
+                    print(f"\n{'Capture ID':<55} {'Packets':>8}")
+                    print("-" * 65)
+                    for c in captures:
+                        print(
+                            f"{Fore.CYAN}{c['capture_id']:<55}{Style.RESET_ALL} "
+                            f"{c['count']:>8}"
+                        )
+                    print(f"\nTotal captures: {len(captures)}\n")
+            except Exception as e:
+                print(f"Failed to fetch captures: {e}\n")
+            continue
+
+        #/netdel <capture_id>
+        if cmd_l.startswith("/netdel "):
+            capture_id = cmd[len("/netdel "):].strip()
+            capture_id = strip_quotes(capture_id)
+
+            if not capture_id:
+                print("Usage: /netdel <capture_id>\n")
+                continue
+
+            #Show packet count
+            try:
+                r = requests.get(f"{BASE_URL}/net/captures", timeout=15)
+                r.raise_for_status()
+                captures   = r.json().get("captures", [])
+                match      = next(
+                    (c for c in captures if c["capture_id"] == capture_id), None
+                )
+
+                if not match:
+                    print(
+                        f"Capture '{capture_id}' not found in database.\n"
+                        f"Use /netcaptures to see available captures.\n"
+                    )
+                    continue
+
+                #Confirm before deleting
+                print(
+                    f"\n{Fore.YELLOW}About to delete:{Style.RESET_ALL} "
+                    f"{capture_id} ({match['count']} packets)\n"
+                    f"This cannot be undone. Type the capture name to confirm, "
+                    f"or press Enter to cancel: ",
+                    end=""
+                )
+                confirm = input().strip()
+
+                if confirm != capture_id:
+                    print("Cancelled.\n")
+                    continue
+
+                r = requests.delete(
+                    f"{BASE_URL}/net/delete_capture",
+                    params={"capture_id": capture_id},
+                    timeout=30,
+                )
+                r.raise_for_status()
+                out = r.json()
+                print(
+                    f"\n{Fore.GREEN}Deleted:{Style.RESET_ALL} "
+                    f"{out['packets_deleted']} packets from '{capture_id}'\n"
+                    f"Note: run train_anomaly.py to retrain the model "
+                    f"without this capture's data.\n"
+                )
+
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 404:
+                    print(f"Capture not found: {capture_id}\n")
+                else:
+                    print(f"Delete failed: {e}\n")
+            except Exception as e:
+                print(f"Delete failed: {e}\n")
+            continue
+
+        #4) add
         if cmd_l.startswith("/netadd "):
             text = cmd[len("/netadd "):].strip()
             if not text:
@@ -864,13 +1105,13 @@ def main():
             print(f"Net memory added. ID: {out.get('memory_id', '(no id returned)')}\n")
             continue
         
-        # 5) /net help
+        #5) /net help
         if cmd_l in {"/net", "/net help", "/net/help"}:
             print(color_block(NET_BANNER, Fore.CYAN))
             print(NET_HELP + "\n")
             continue
         
-        # 6) net help
+        #6) net help
         if cmd_l in {"/nethelp"}:
             print(NET_HELP + "\n")
             continue
@@ -910,7 +1151,7 @@ def main():
             #Stop spinner before streaming so output is clean
             stop_spinner()
 
-            sys.stdout.write("Zeta: ")
+            sys.stdout.write("Sairene: ")
             sys.stdout.flush()
 
             reply = ollama_chat_stream(messages, model=CHAT_MODEL)
@@ -940,4 +1181,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
