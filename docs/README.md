@@ -137,7 +137,7 @@ During this pass, Sairene uses dedicated L2 trackers to aggregate behavior over 
 - VLAN Hopping / Double-Tagging
 
 <p align="center">
-  <img src="assets/screenshot.png" alt="App Dashboard" width="600">
+  <img src="docs/screenshots/STP_netask_output.png" alt="netask example of L2 attack" width="600">
 </p>
 
 ## ⏱️ Bidirectional IAT Tracking
