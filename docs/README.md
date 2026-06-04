@@ -94,7 +94,7 @@ PCAP[Raw PCAP / PCAPNG] --> ING
 
 **Hybrid Detection Gate**
 
-Sairene uses a two-pass scoring model:
+Sairene uses a three-pass scoring model:
 
 ***Pass 1: Statistical Detection***
 
@@ -121,6 +121,24 @@ Sairene uses a two-pass scoring model:
 - Sequential host touches
 - Delayed packet cadence
 - Low-noise scanning behavior
+
+***Pass 3: Layer 2 Behavioral Summaries***
+
+Pass 3 analyzes traffic that cannot be represented reliably as normal IP flows.  
+While Pass 2 groups packets into L3/L4 flows, many infrastructure-level attacks happen at Layer 2 and do not follow TCP/UDP flow semantics.
+
+During this pass, Sairene uses dedicated L2 trackers to aggregate behavior over time and emit `l2_summary` records. These summaries represent incident-level evidence for attacks such as:
+
+- ARP Poisoning
+- Gratuitous ARP Storms
+- DHCP Starvation
+- MAC Flooding
+- STP Root Bridge Attacks
+- VLAN Hopping / Double-Tagging
+
+<p align="center">
+  <img src="assets/screenshot.png" alt="App Dashboard" width="600">
+</p>
 
 ## ⏱️ Bidirectional IAT Tracking
 
