@@ -122,6 +122,18 @@ Sairene uses a three-pass scoring model:
 - Delayed packet cadence
 - Low-noise scanning behavior
 
+<p align="center">
+  <img src="/docs/screenshots/netask_lownslow_output.png" alt="lowNslow netask example" width="600">
+  <br>
+  <sup><i>netask Pass 2 example | Low and Slow Exfiltration Attack</i></sup>
+</p>
+
+<p align="center">
+  <img src="/docs/screenshots/low_n_slow_viz_output.png" alt="STP netviz anom example" width="600">
+  <br>
+  <sup><i>netviz anom Pass 2 example | Low and Slow Exfiltration Attack</i></sup>
+</p>
+
 ***Pass 3: Layer 2 Behavioral Summaries***
 
 Pass 3 analyzes traffic that cannot be represented reliably as normal IP flows.  
@@ -139,13 +151,13 @@ During this pass, Sairene uses dedicated L2 trackers to aggregate behavior over 
 <p align="center">
   <img src="/docs/screenshots/STP_netask_output.png" alt="STP netask example" width="600">
   <br>
-  <sup><i>netask Layer 2 example</i></sup>
+  <sup><i>netask Passs 3 example | STP Root Bridge Attack</i></sup>
 </p>
 
 <p align="center">
   <img src="/docs/screenshots/STP_viz_output.png" alt="STP netviz anom example" width="600">
   <br>
-  <sup><i>netviz anom Layer 2 example</i></sup>
+  <sup><i>netviz anom Pass 3 example | STP Root Bridge Attack</i></sup>
 </p>
 
 ## ⏱️ Bidirectional IAT Tracking
