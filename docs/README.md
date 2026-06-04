@@ -12,10 +12,10 @@
 
 It combines:
 
-- 🌲 **Isolation Forest anomaly detection**
-- 🧠 **Heuristic Behavioral Overrides**
-- 📚 **Retrieval-Augmented Generation (RAG)**
-- 🤖 **LLM-powered plain-English threat analysis**
+-  **Isolation Forest anomaly detection**
+-  **Heuristic Behavioral Overrides**
+-  **Retrieval-Augmented Generation (RAG)**
+-  **LLM-powered plain-English threat analysis**
 
 Sairene specializes in identifying:
 
