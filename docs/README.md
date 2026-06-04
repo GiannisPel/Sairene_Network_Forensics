@@ -77,6 +77,7 @@ PCAP[Raw PCAP / PCAPNG] --> ING
 | `app.py`             | FastAPI service, FAISS memory, SQLite API |
 | `net_pcap_ingest.py` | Batch packet parser using Scapy           |
 | `flow_tracker.py`    | Bidirectional conversation tracker        |
+| `l2_tracker.py`      | Heuristic driven and confidence score detection        |
 | `ml_anomaly.py`      | Hybrid anomaly detection engine           |
 | `train_anomaly.py`   | Offline model retraining                  |
 
