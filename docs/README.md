@@ -106,6 +106,8 @@ Sairene uses a three-pass scoring model:
 - Packet cadence
 - Burst patterns
 
+The 1st Pass can detect attacks that have evidence from single packet analysis. For example a XMAS attack and the unusual flag (FIN + PSH + URG combination does not appear in a usual traffic)
+
 ***Pass 2: Behavioral Override***
 
 **Rules specifically target:**
