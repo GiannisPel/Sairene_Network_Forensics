@@ -176,7 +176,7 @@ This enables accurate detection of:
 ## 📊 Results Table
 
 This table shows how effective Sairene was to identifying attacks in simulated attacks in my homelab. 
-(All 13 tested attacks are reported as CRITICAL due to the controlled evaluation design where each scenario is executed at maximum intensity to validate detection capability).
+(Demonstrated detection across 12 controlled homelab attack scenarios; VLAN double-tagging logic implemented but not empirically tested.).
 
 <p align="center">
   <img src="/docs/screenshots/results_table.png" alt="Results Table" width="600">
